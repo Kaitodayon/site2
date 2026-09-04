@@ -208,6 +208,12 @@
 
     <!-- SCREEN 1: upload -->
     <section class="screen active" id="screen-upload">
+      <div class="card" id="resumeCard" style="display:none;margin-bottom:14px;">
+        <h2 class="section-title">前回の続きがあります</h2>
+        <p class="empty-note" id="resumeInfo" style="padding:0 0 14px;"></p>
+        <button class="btn btn-primary" id="resumeBtn">続きから再開する</button>
+        <button class="btn btn-flat" id="discardResumeBtn" style="margin-top:10px;">この記録を消して新しく始める</button>
+      </div>
       <div class="drop" id="dropZone">
         <p>Excelファイル(.xlsx / .csv)を<br>選択してください</p>
         <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
@@ -257,6 +263,7 @@
       </div>
       <div class="card" style="margin-top:14px;">
         <button class="btn btn-flat" id="exportBtn">結果をExcelでダウンロード</button>
+        <button class="btn btn-ghost" id="clearDataBtn" style="margin-top:10px;">この端末の記録を消去する</button>
       </div>
     </section>
 
@@ -320,6 +327,8 @@
 (function(){
   "use strict";
 
+  var STORAGE_KEY = 'telecall_session_v1';
+
   var state = {
     rawRows: [],       // array of objects from sheet
     headers: [],
@@ -348,6 +357,71 @@
     };
     document.getElementById('headerSub').textContent = subMap[name] || '';
   }
+
+  /* ---------- local persistence ---------- */
+
+  function persistSession(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        contacts: state.contacts,
+        currentIndex: state.currentIndex,
+        savedAt: Date.now()
+      }));
+    }catch(e){
+      console.warn('保存に失敗しました(データ量が大きすぎる可能性があります):', e);
+    }
+  }
+
+  function loadPersistedSession(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return null;
+      return JSON.parse(raw);
+    }catch(e){
+      return null;
+    }
+  }
+
+  function clearPersistedSession(){
+    try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+  }
+
+  function checkForResume(){
+    var saved = loadPersistedSession();
+    if(!saved || !saved.contacts || saved.contacts.length === 0) return;
+    var total = saved.contacts.length;
+    var done = saved.contacts.filter(function(c){return c.status;}).length;
+    var d = new Date(saved.savedAt);
+    var dateStr = (d.getMonth()+1)+'月'+d.getDate()+'日 '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+    document.getElementById('resumeInfo').textContent =
+      '全'+total+'件中'+done+'件架電済み(最終保存:'+dateStr+')';
+    document.getElementById('resumeCard').style.display = 'block';
+
+    document.getElementById('resumeBtn').addEventListener('click', function(){
+      state.contacts = saved.contacts;
+      state.currentIndex = Math.min(saved.currentIndex, saved.contacts.length - 1);
+      renderOverview();
+      showScreen('overview');
+    });
+    document.getElementById('discardResumeBtn').addEventListener('click', function(){
+      if(confirm('保存されている記録を消去します。よろしいですか?')){
+        clearPersistedSession();
+        document.getElementById('resumeCard').style.display = 'none';
+      }
+    });
+  }
+
+  checkForResume();
+
+  document.getElementById('clearDataBtn').addEventListener('click', function(){
+    if(confirm('この端末に保存されている架電記録をすべて消去します。Excelでダウンロードしていない結果は失われます。よろしいですか?')){
+      clearPersistedSession();
+      state.contacts = [];
+      state.currentIndex = 0;
+      document.getElementById('resumeCard').style.display = 'none';
+      showScreen('upload');
+    }
+  });
 
   /* ---------- file upload & parsing ---------- */
 
@@ -483,6 +557,7 @@
     }
 
     state.currentIndex = 0;
+    persistSession();
     renderOverview();
     showScreen('overview');
   });
@@ -525,6 +600,7 @@
     Array.prototype.forEach.call(listEl.querySelectorAll('.list-item'), function(el){
       el.addEventListener('click', function(){
         state.currentIndex = parseInt(el.getAttribute('data-idx'),10);
+        persistSession();
         renderCallScreen();
         showScreen('call');
       });
@@ -621,12 +697,14 @@
       c.apptDate = '';
       c.apptAmpm = '';
     }
+    persistSession();
   }
 
   document.getElementById('nextBtn').addEventListener('click', function(){
     saveCurrent();
     if(state.currentIndex < state.contacts.length - 1){
       state.currentIndex++;
+      persistSession();
       renderCallScreen();
     } else {
       renderOverview();
@@ -638,6 +716,7 @@
     saveCurrent();
     if(state.currentIndex > 0){
       state.currentIndex--;
+      persistSession();
       renderCallScreen();
     }
   });
