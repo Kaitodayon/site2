@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>架電サポート</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --ink:#1c2b2a;
+    --paper:#f6f5f1;
+    --panel:#ffffff;
+    --line:#dcd8cd;
+    --teal:#1f5f5b;
+    --teal-dark:#173f3c;
+    --amber:#b8792f;
+    --brick:#a54b3a;
+    --sage:#3f7d5c;
+    --muted:#7a7568;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Noto Sans JP',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  #app{max-width:520px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;}
+
+  header.top{
+    padding:18px 20px 14px;
+    border-bottom:1px solid var(--line);
+    background:var(--panel);
+    position:sticky;top:0;z-index:5;
+  }
+  header.top h1{
+    margin:0;
+    font-size:17px;
+    font-weight:700;
+    letter-spacing:.01em;
+  }
+  header.top .sub{
+    margin-top:2px;
+    font-size:12.5px;
+    color:var(--muted);
+  }
+
+  main{flex:1;padding:20px;padding-bottom:100px;}
+
+  .card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px;
+  }
+  .card + .card{margin-top:14px;}
+
+  /* --- upload screen --- */
+  .drop{
+    border:1.5px dashed var(--line);
+    border-radius:14px;
+    padding:36px 20px;
+    text-align:center;
+    background:var(--panel);
+  }
+  .drop p{margin:0 0 14px;color:var(--muted);font-size:14px;line-height:1.7;}
+  .drop input{display:none;}
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    border:none;border-radius:10px;
+    padding:14px 18px;
+    font-family:inherit;font-size:15px;font-weight:600;
+    cursor:pointer;
+    width:100%;
+    transition:transform .08s ease, opacity .15s ease;
+  }
+  .btn:active{transform:scale(.98);}
+  .btn-primary{background:var(--teal);color:#fff;}
+  .btn-primary:hover{background:var(--teal-dark);}
+  .btn-ghost{background:transparent;color:var(--teal);border:1.5px solid var(--teal);}
+  .btn-flat{background:#eeece4;color:var(--ink);}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+
+  label.field-label{
+    display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px;font-weight:500;
+  }
+  select, textarea, input[type=date], input[type=text]{
+    width:100%;
+    font-family:inherit;
+    font-size:15px;
+    padding:11px 12px;
+    border:1px solid var(--line);
+    border-radius:9px;
+    background:#fff;
+    color:var(--ink);
+  }
+  .field{margin-bottom:14px;}
+
+  table.preview{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:12px;}
+  table.preview th, table.preview td{
+    border-bottom:1px solid var(--line);
+    padding:7px 6px;
+    text-align:left;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    max-width:110px;
+  }
+  table.preview th{color:var(--muted);font-weight:600;}
+
+  /* --- overview / list screen --- */
+  .stat-row{display:flex;gap:10px;margin-bottom:16px;}
+  .stat{
+    flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:12px 10px;text-align:center;
+  }
+  .stat .num{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600;}
+  .stat .lbl{font-size:11px;color:var(--muted);margin-top:2px;}
+
+  .progress-track{height:6px;background:#e7e4da;border-radius:99px;overflow:hidden;margin:14px 0 6px;}
+  .progress-fill{height:100%;background:var(--teal);border-radius:99px;transition:width .3s ease;}
+  .progress-text{font-size:12px;color:var(--muted);text-align:right;}
+
+  .list-item{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:14px 4px;border-bottom:1px solid var(--line);gap:10px;
+  }
+  .list-item:last-child{border-bottom:none;}
+  .li-name{font-weight:600;font-size:14.5px;}
+  .li-phone{font-size:12.5px;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+  .badge{
+    font-size:11px;font-weight:600;padding:3px 9px;border-radius:99px;white-space:nowrap;
+  }
+  .badge-pending{background:#ecebe3;color:var(--muted);}
+  .badge-absent{background:#f1e6d3;color:var(--amber);}
+  .badge-declined{background:#f3ddd7;color:var(--brick);}
+  .badge-appt{background:#dcede2;color:var(--sage);}
+  .badge-other{background:#e3e6ea;color:#4b5563;}
+
+  /* --- call screen --- */
+  .call-card{text-align:center;padding:28px 22px;}
+  .call-index{font-size:12px;color:var(--muted);letter-spacing:.02em;}
+  .call-name{font-size:22px;font-weight:700;margin:6px 0 2px;}
+  .call-sub{font-size:13.5px;color:var(--muted);margin-bottom:18px;}
+  .call-phone{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:26px;font-weight:600;letter-spacing:.02em;
+    color:var(--teal-dark);
+    margin-bottom:18px;
+  }
+  a.dial-btn{
+    display:flex;align-items:center;justify-content:center;gap:10px;
+    text-decoration:none;
+    background:var(--teal);color:#fff;
+    border-radius:12px;padding:16px;font-size:16px;font-weight:700;
+    margin-bottom:6px;
+  }
+  a.dial-btn:active{transform:scale(.98);}
+  .hint{font-size:12px;color:var(--muted);margin-top:2px;}
+
+  .result-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px;}
+  .result-btn{
+    border:1.5px solid var(--line);background:#fff;border-radius:11px;
+    padding:14px 8px;font-family:inherit;font-size:14px;font-weight:600;color:var(--ink);
+    cursor:pointer;
+  }
+  .result-btn.selected{border-color:var(--teal);background:#eaf2f1;color:var(--teal-dark);}
+
+  .appt-detail{
+    margin-top:14px;padding:14px;background:#f3f2ec;border-radius:11px;
+    display:none;
+  }
+  .appt-detail.show{display:block;}
+  .ampm-row{display:flex;gap:8px;margin-top:8px;}
+  .ampm-row .result-btn{flex:1;padding:10px;}
+
+  .nav-row{display:flex;gap:10px;margin-top:18px;}
+  .nav-row .btn{flex:1;}
+
+  footer.bottom-bar{
+    position:sticky;bottom:0;background:var(--panel);
+    border-top:1px solid var(--line);
+    padding:12px 20px calc(12px + env(safe-area-inset-bottom));
+    display:flex;gap:10px;
+  }
+
+  .screen{display:none;}
+  .screen.active{display:block;}
+
+  h2.section-title{font-size:15px;margin:0 0 12px;font-weight:700;}
+
+  .empty-note{font-size:13px;color:var(--muted);line-height:1.7;text-align:center;padding:30px 10px;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header class="top">
+    <h1>架電サポート</h1>
+    <div class="sub" id="headerSub">テレアポリストを読み込んで開始</div>
+  </header>
+
+  <main>
+
+    <!-- SCREEN 1: upload -->
+    <section class="screen active" id="screen-upload">
+      <div class="drop" id="dropZone">
+        <p>Excelファイル(.xlsx / .csv)を<br>選択してください</p>
+        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+        <button class="btn btn-primary" id="pickFileBtn" type="button">ファイルを選ぶ</button>
+      </div>
+      <div class="card" id="mappingCard" style="display:none;margin-top:14px;">
+        <h2 class="section-title">列の対応づけ</h2>
+        <div class="field">
+          <label class="field-label">会社名・氏名として使う列</label>
+          <select id="mapName"></select>
+        </div>
+        <div class="field">
+          <label class="field-label">電話番号として使う列</label>
+          <select id="mapPhone"></select>
+        </div>
+        <div class="field">
+          <label class="field-label">担当者名(任意)</label>
+          <select id="mapContact"></select>
+        </div>
+        <div class="field">
+          <label class="field-label">備考(任意・一覧に表示)</label>
+          <select id="mapMemo"></select>
+        </div>
+        <div class="field">
+          <label class="field-label">No.(任意・元データの管理番号があれば選択)</label>
+          <select id="mapNo"></select>
+        </div>
+        <table class="preview" id="previewTable"></table>
+        <button class="btn btn-primary" id="confirmMapBtn" style="margin-top:16px;">このリストで架電を開始</button>
+      </div>
+    </section>
+
+    <!-- SCREEN 2: overview -->
+    <section class="screen" id="screen-overview">
+      <div class="stat-row">
+        <div class="stat"><div class="num" id="statTotal">0</div><div class="lbl">全体</div></div>
+        <div class="stat"><div class="num" id="statDone">0</div><div class="lbl">架電済</div></div>
+        <div class="stat"><div class="num" id="statAppt">0</div><div class="lbl">アポ</div></div>
+      </div>
+      <div class="progress-track"><div class="progress-fill" id="overviewProgress"></div></div>
+      <div class="card" style="margin-top:14px;">
+        <button class="btn btn-primary" id="startCallBtn">架電を始める</button>
+      </div>
+      <div class="card" id="listCard" style="margin-top:14px;">
+        <h2 class="section-title">リスト</h2>
+        <div id="listItems"></div>
+      </div>
+      <div class="card" style="margin-top:14px;">
+        <button class="btn btn-flat" id="exportBtn">結果をExcelでダウンロード</button>
+      </div>
+    </section>
+
+    <!-- SCREEN 3: call -->
+    <section class="screen" id="screen-call">
+      <div class="card call-card">
+        <div class="call-index" id="callIndex">1 / 10</div>
+        <div class="call-name" id="callName">—</div>
+        <div class="call-sub" id="callSub"></div>
+        <div class="call-phone" id="callPhone">—</div>
+        <a href="#" class="dial-btn" id="dialBtn">電話をかける</a>
+        <div class="hint">タップすると電話アプリが開きます</div>
+
+        <div class="result-grid">
+          <button class="result-btn" data-result="不在">不在</button>
+          <button class="result-btn" data-result="断り">断り</button>
+          <button class="result-btn" data-result="アポ獲得">アポ獲得</button>
+          <button class="result-btn" data-result="その他">その他</button>
+        </div>
+
+        <div class="appt-detail" id="apptDetail">
+          <label class="field-label">アポ日程</label>
+          <input type="date" id="apptDate">
+          <div class="ampm-row">
+            <button class="result-btn" data-ampm="午前">午前</button>
+            <button class="result-btn" data-ampm="午後">午後</button>
+          </div>
+        </div>
+
+        <div class="field" style="margin-top:14px;text-align:left;">
+          <label class="field-label">メモ</label>
+          <textarea id="memoInput" rows="2" placeholder="任意でメモを入力"></textarea>
+        </div>
+
+        <div class="nav-row">
+          <button class="btn btn-ghost" id="prevBtn">戻る</button>
+          <button class="btn btn-primary" id="nextBtn">保存して次へ</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCREEN 4: finished -->
+    <section class="screen" id="screen-done">
+      <div class="card" style="text-align:center;">
+        <h2 class="section-title" style="text-align:center;">リストの架電が完了しました</h2>
+        <p class="empty-note">お疲れさまでした。結果をExcelでダウンロードできます。</p>
+        <button class="btn btn-primary" id="exportBtn2">結果をExcelでダウンロード</button>
+        <button class="btn btn-ghost" id="backToOverviewBtn" style="margin-top:10px;">一覧に戻る</button>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="bottom-bar" id="callFooter" style="display:none;">
+    <button class="btn btn-flat" id="backToListBtn">一覧へ</button>
+  </footer>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var state = {
+    rawRows: [],       // array of objects from sheet
+    headers: [],
+    mapping: {name:null, phone:null, contact:null, memo:null},
+    contacts: [],       // {name, phone, contact, memo, status, apptDate, apptAmpm, note}
+    currentIndex: 0
+  };
+
+  var screens = {
+    upload: document.getElementById('screen-upload'),
+    overview: document.getElementById('screen-overview'),
+    call: document.getElementById('screen-call'),
+    done: document.getElementById('screen-done')
+  };
+
+  function showScreen(name){
+    Object.keys(screens).forEach(function(k){
+      screens[k].classList.toggle('active', k===name);
+    });
+    document.getElementById('callFooter').style.display = (name==='call') ? 'flex' : 'none';
+    var subMap = {
+      upload:'テレアポリストを読み込んで開始',
+      overview:'一覧を確認して架電を開始',
+      call:'通話後、結果を記録してください',
+      done:'架電完了'
+    };
+    document.getElementById('headerSub').textContent = subMap[name] || '';
+  }
+
+  /* ---------- file upload & parsing ---------- */
+
+  var fileInput = document.getElementById('fileInput');
+  document.getElementById('pickFileBtn').addEventListener('click', function(){ fileInput.click(); });
+  document.getElementById('dropZone').addEventListener('click', function(e){
+    if(e.target.id !== 'pickFileBtn') fileInput.click();
+  });
+
+  fileInput.addEventListener('change', function(e){
+    var file = e.target.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      try{
+        var data = new Uint8Array(ev.target.result);
+        var wb = XLSX.read(data, {type:'array'});
+        var sheet = wb.Sheets[wb.SheetNames[0]];
+        var rows = XLSX.utils.sheet_to_json(sheet, {defval:''});
+        if(rows.length === 0){
+          alert('データが見つかりませんでした。1行目に見出し(会社名・電話番号など)があるか確認してください。');
+          return;
+        }
+        state.rawRows = rows;
+        state.headers = Object.keys(rows[0]);
+        setupMapping();
+      }catch(err){
+        alert('ファイルの読み込みに失敗しました: ' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+
+  function guessColumn(headers, keywords){
+    for(var i=0;i<headers.length;i++){
+      var h = String(headers[i]).toLowerCase();
+      for(var j=0;j<keywords.length;j++){
+        if(h.indexOf(keywords[j]) !== -1) return headers[i];
+      }
+    }
+    return '';
+  }
+
+  function guessNoColumn(headers){
+    for(var i=0;i<headers.length;i++){
+      var h = String(headers[i]).toLowerCase();
+      if(h.indexOf('電話') !== -1 || h.indexOf('tel') !== -1) continue;
+      if(h === 'no' || h === 'no.' || h === 'id' || h.indexOf('管理番号') !== -1 || h.indexOf('顧客番号') !== -1 || h.indexOf('連番') !== -1 || h === '番号' || h === 'ナンバー'){
+        return headers[i];
+      }
+    }
+    return '';
+  }
+
+  function setupMapping(){
+    var headers = state.headers;
+    var selects = {
+      name: document.getElementById('mapName'),
+      phone: document.getElementById('mapPhone'),
+      contact: document.getElementById('mapContact'),
+      memo: document.getElementById('mapMemo'),
+      no: document.getElementById('mapNo')
+    };
+    Object.keys(selects).forEach(function(key){
+      var sel = selects[key];
+      sel.innerHTML = '';
+      if(key !== 'name' && key !== 'phone'){
+        var noneOpt = document.createElement('option');
+        noneOpt.value = ''; noneOpt.textContent = '(使用しない)';
+        sel.appendChild(noneOpt);
+      }
+      headers.forEach(function(h){
+        var opt = document.createElement('option');
+        opt.value = h; opt.textContent = h;
+        sel.appendChild(opt);
+      });
+    });
+
+    selects.name.value = guessColumn(headers, ['会社','企業','氏名','名前','name']) || headers[0];
+    selects.phone.value = guessColumn(headers, ['電話','tel','phone']) || headers[Math.min(1,headers.length-1)];
+    selects.contact.value = guessColumn(headers, ['担当','contact']) || '';
+    selects.memo.value = guessColumn(headers, ['備考','メモ','memo','業種']) || '';
+    selects.no.value = guessNoColumn(headers) || '';
+
+    renderPreview();
+    document.getElementById('mappingCard').style.display = 'block';
+  }
+
+  function renderPreview(){
+    var table = document.getElementById('previewTable');
+    var headers = state.headers;
+    var rowsToShow = state.rawRows.slice(0,4);
+    var html = '<tr>' + headers.map(function(h){return '<th>'+escapeHtml(h)+'</th>';}).join('') + '</tr>';
+    rowsToShow.forEach(function(r){
+      html += '<tr>' + headers.map(function(h){return '<td>'+escapeHtml(String(r[h]))+'</td>';}).join('') + '</tr>';
+    });
+    table.innerHTML = html;
+  }
+
+  function escapeHtml(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  ['mapName','mapPhone','mapContact','mapMemo'].forEach(function(id){
+    document.getElementById(id).addEventListener('change', function(){});
+  });
+
+  document.getElementById('confirmMapBtn').addEventListener('click', function(){
+    var nameCol = document.getElementById('mapName').value;
+    var phoneCol = document.getElementById('mapPhone').value;
+    var contactCol = document.getElementById('mapContact').value;
+    var memoCol = document.getElementById('mapMemo').value;
+    var noCol = document.getElementById('mapNo').value;
+
+    state.contacts = state.rawRows.map(function(r, i){
+      var noVal = noCol ? String(r[noCol] || '').trim() : '';
+      return {
+        no: noVal || String(i + 1),
+        name: String(r[nameCol] || '').trim(),
+        phone: String(r[phoneCol] || '').trim(),
+        contact: contactCol ? String(r[contactCol] || '').trim() : '',
+        memo: memoCol ? String(r[memoCol] || '').trim() : '',
+        status: '',
+        apptDate: '',
+        apptAmpm: '',
+        note: ''
+      };
+    }).filter(function(c){ return c.phone; });
+
+    if(state.contacts.length === 0){
+      alert('電話番号が読み取れる行がありませんでした。列の対応づけを見直してください。');
+      return;
+    }
+
+    state.currentIndex = 0;
+    renderOverview();
+    showScreen('overview');
+  });
+
+  /* ---------- overview screen ---------- */
+
+  function statusBadge(status){
+    var map = {
+      '': ['未架電','badge-pending'],
+      '不在': ['不在','badge-absent'],
+      '断り': ['断り','badge-declined'],
+      'アポ獲得': ['アポ獲得','badge-appt'],
+      'その他': ['その他','badge-other']
+    };
+    var m = map[status] || map[''];
+    return '<span class="badge '+m[1]+'">'+m[0]+'</span>';
+  }
+
+  function renderOverview(){
+    var total = state.contacts.length;
+    var done = state.contacts.filter(function(c){return c.status;}).length;
+    var appt = state.contacts.filter(function(c){return c.status==='アポ獲得';}).length;
+    document.getElementById('statTotal').textContent = total;
+    document.getElementById('statDone').textContent = done;
+    document.getElementById('statAppt').textContent = appt;
+    document.getElementById('overviewProgress').style.width = (total? (done/total*100):0) + '%';
+
+    var listEl = document.getElementById('listItems');
+    listEl.innerHTML = state.contacts.map(function(c, i){
+      var apptText = (c.status==='アポ獲得' && c.apptDate) ? (formatDate(c.apptDate) + ' ' + c.apptAmpm) : '';
+      return '<div class="list-item" data-idx="'+i+'">' +
+        '<div>' +
+          '<div class="li-name">No.'+escapeHtml(c.no)+'　'+escapeHtml(c.name||'(名称未設定)')+'</div>' +
+          '<div class="li-phone">'+escapeHtml(c.phone)+(apptText? ' ・ '+escapeHtml(apptText):'')+'</div>' +
+        '</div>' +
+        statusBadge(c.status) +
+      '</div>';
+    }).join('');
+
+    Array.prototype.forEach.call(listEl.querySelectorAll('.list-item'), function(el){
+      el.addEventListener('click', function(){
+        state.currentIndex = parseInt(el.getAttribute('data-idx'),10);
+        renderCallScreen();
+        showScreen('call');
+      });
+    });
+  }
+
+  function formatDate(d){
+    if(!d) return '';
+    var parts = d.split('-');
+    if(parts.length!==3) return d;
+    return parts[1]+'月'+parts[2]+'日';
+  }
+
+  document.getElementById('startCallBtn').addEventListener('click', function(){
+    var idx = state.contacts.findIndex(function(c){ return !c.status; });
+    state.currentIndex = idx === -1 ? 0 : idx;
+    renderCallScreen();
+    showScreen('call');
+  });
+
+  document.getElementById('backToListBtn').addEventListener('click', function(){
+    renderOverview();
+    showScreen('overview');
+  });
+  document.getElementById('backToOverviewBtn').addEventListener('click', function(){
+    renderOverview();
+    showScreen('overview');
+  });
+
+  /* ---------- call screen ---------- */
+
+  var selectedResult = '';
+  var selectedAmpm = '';
+
+  function renderCallScreen(){
+    var c = state.contacts[state.currentIndex];
+    if(!c) return;
+    document.getElementById('callIndex').textContent = (state.currentIndex+1) + ' / ' + state.contacts.length + '　(No.' + c.no + ')';
+    document.getElementById('callName').textContent = c.name || '(名称未設定)';
+    document.getElementById('callSub').textContent = [c.contact, c.memo].filter(Boolean).join(' ・ ');
+    document.getElementById('callPhone').textContent = c.phone;
+    document.getElementById('dialBtn').href = 'tel:' + c.phone.replace(/[^0-9+]/g,'');
+    document.getElementById('memoInput').value = c.note || '';
+
+    selectedResult = c.status || '';
+    selectedAmpm = c.apptAmpm || '';
+    document.getElementById('apptDate').value = c.apptDate || '';
+
+    updateResultButtons();
+    updateApptVisibility();
+
+    document.getElementById('prevBtn').disabled = (state.currentIndex === 0);
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('.result-btn[data-result]'), function(btn){
+    btn.addEventListener('click', function(){
+      selectedResult = btn.getAttribute('data-result');
+      updateResultButtons();
+      updateApptVisibility();
+    });
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll('.result-btn[data-ampm]'), function(btn){
+    btn.addEventListener('click', function(){
+      selectedAmpm = btn.getAttribute('data-ampm');
+      updateAmpmButtons();
+    });
+  });
+
+  function updateResultButtons(){
+    Array.prototype.forEach.call(document.querySelectorAll('.result-btn[data-result]'), function(btn){
+      btn.classList.toggle('selected', btn.getAttribute('data-result') === selectedResult);
+    });
+  }
+  function updateAmpmButtons(){
+    Array.prototype.forEach.call(document.querySelectorAll('.result-btn[data-ampm]'), function(btn){
+      btn.classList.toggle('selected', btn.getAttribute('data-ampm') === selectedAmpm);
+    });
+  }
+  function updateApptVisibility(){
+    document.getElementById('apptDetail').classList.toggle('show', selectedResult === 'アポ獲得');
+    updateAmpmButtons();
+  }
+
+  function saveCurrent(){
+    var c = state.contacts[state.currentIndex];
+    if(!c) return;
+    c.status = selectedResult;
+    c.note = document.getElementById('memoInput').value;
+    if(selectedResult === 'アポ獲得'){
+      c.apptDate = document.getElementById('apptDate').value;
+      c.apptAmpm = selectedAmpm;
+    } else {
+      c.apptDate = '';
+      c.apptAmpm = '';
+    }
+  }
+
+  document.getElementById('nextBtn').addEventListener('click', function(){
+    saveCurrent();
+    if(state.currentIndex < state.contacts.length - 1){
+      state.currentIndex++;
+      renderCallScreen();
+    } else {
+      renderOverview();
+      showScreen('done');
+    }
+  });
+
+  document.getElementById('prevBtn').addEventListener('click', function(){
+    saveCurrent();
+    if(state.currentIndex > 0){
+      state.currentIndex--;
+      renderCallScreen();
+    }
+  });
+
+  /* ---------- export ---------- */
+
+  function exportResults(){
+    if(state.contacts.length === 0){
+      alert('まだリストが読み込まれていません。');
+      return;
+    }
+    var data = state.contacts.map(function(c){
+      return {
+        'No.': c.no,
+        '会社名・氏名': c.name,
+        '電話番号': c.phone,
+        '担当者': c.contact,
+        '備考': c.memo,
+        '架電結果': c.status || '未架電',
+        'アポ日付': c.apptDate ? formatDate(c.apptDate) : '',
+        'アポ午前午後': c.apptAmpm || '',
+        'メモ': c.note || ''
+      };
+    });
+    var ws = XLSX.utils.json_to_sheet(data);
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '架電結果');
+    var today = new Date();
+    var fname = '架電結果_' + today.getFullYear() + String(today.getMonth()+1).padStart(2,'0') + String(today.getDate()).padStart(2,'0') + '.xlsx';
+    XLSX.writeFile(wb, fname);
+  }
+
+  document.getElementById('exportBtn').addEventListener('click', exportResults);
+  document.getElementById('exportBtn2').addEventListener('click', exportResults);
+
+})();
+</script>
+</body>
+</html>
