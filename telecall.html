@@ -728,14 +728,19 @@
       alert('まだリストが読み込まれていません。');
       return;
     }
-    var data = state.contacts.map(function(c){
+    var called = state.contacts.filter(function(c){ return c.status; });
+    if(called.length === 0){
+      alert('まだ架電結果が記録されていません。');
+      return;
+    }
+    var data = called.map(function(c){
       return {
         'No.': c.no,
         '会社名・氏名': c.name,
         '電話番号': c.phone,
         '担当者': c.contact,
         '備考': c.memo,
-        '架電結果': c.status || '未架電',
+        '架電結果': c.status,
         'アポ日付': c.apptDate ? formatDate(c.apptDate) : '',
         'アポ午前午後': c.apptAmpm || '',
         'メモ': c.note || ''
